@@ -514,8 +514,8 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 			[lb loadEntriesForPlayerScope:playerScope
 				timeScope:GKLeaderboardTimeScopeAllTime
 				range:NSMakeRange(1, count)
-				completionHandler:^(GKLeaderboard.Entry *localEntry,
-					NSArray<GKLeaderboard.Entry *> *entries,
+				completionHandler:^(GKLeaderboardEntry *localEntry,
+					NSArray<GKLeaderboardEntry *> *entries,
 					NSInteger totalCount, NSError *loadError) {
 
 				Dictionary ret;
@@ -529,7 +529,7 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 					ret["total_count"] = (int64_t)totalCount;
 
 					Array entry_list;
-					for (GKLeaderboard.Entry *e in entries) {
+					for (GKLeaderboardEntry *e in entries) {
 						Dictionary ed;
 						ed["rank"] = (int64_t)e.rank;
 						ed["score"] = (int64_t)e.score;
