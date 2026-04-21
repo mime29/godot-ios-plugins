@@ -82,6 +82,9 @@ void GameCenter::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_pending_event_count"), &GameCenter::get_pending_event_count);
 	ClassDB::bind_method(D_METHOD("pop_pending_event"), &GameCenter::pop_pending_event);
 
+	// Leaderboard entries.
+	ClassDB::bind_method(D_METHOD("request_leaderboard_entries"), &GameCenter::request_leaderboard_entries);
+
 	// Matchmaking.
 	ClassDB::bind_method(D_METHOD("find_match"), &GameCenter::find_match);
 	ClassDB::bind_method(D_METHOD("send_match_data"), &GameCenter::send_match_data);
@@ -474,6 +477,98 @@ Variant GameCenter::pop_pending_event() {
 GameCenter *GameCenter::get_singleton() {
 	return instance;
 };
+
+Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
+	ERR_FAIL_COND_V(!p_params.has("leaderboard_id"), ERR_INVALID_PARAMETER);
+	ERR_FAIL_COND_V(!is_authenticated(), ERR_UNAUTHORIZED);
+
+	String leaderboard_id = p_params["leaderboard_id"];
+	int count = p_params.has("count") ? (int)p_params["count"] : 10;
+	// scope: 0 = global, 1 = friends
+	int scope = p_params.has("scope") ? (int)p_params["scope"] : 0;
+
+	NSString *lid = [[NSString alloc] initWithUTF8String:leaderboard_id.utf8().get_data()];
+
+	if (@available(iOS 14, *)) {
+		[GKLeaderboard loadLeaderboardsWithIDs:@[lid]
+			completionHandler:^(NSArray<GKLeaderboard *> *leaderboards, NSError *error) {
+			if (error || leaderboards.count == 0) {
+				Dictionary ret;
+				ret["type"] = "leaderboard_entries";
+				ret["result"] = "error";
+				if (error) {
+					ret["error_code"] = (int64_t)error.code;
+					ret["error_description"] = [error.localizedDescription UTF8String];
+				} else {
+					ret["error_description"] = "Leaderboard not found";
+				}
+				pending_events.push_back(ret);
+				return;
+			}
+
+			GKLeaderboard *lb = leaderboards[0];
+			GKLeaderboardPlayerScope playerScope = (scope == 1)
+				? GKLeaderboardPlayerScopeFriendsOnly
+				: GKLeaderboardPlayerScopeGlobal;
+
+			[lb loadEntriesForPlayerScope:playerScope
+				timeScope:GKLeaderboardTimeScopeAllTime
+				range:NSMakeRange(1, count)
+				completionHandler:^(GKLeaderboard.Entry *localEntry,
+					NSArray<GKLeaderboard.Entry *> *entries,
+					NSInteger totalCount, NSError *loadError) {
+
+				Dictionary ret;
+				ret["type"] = "leaderboard_entries";
+				if (loadError) {
+					ret["result"] = "error";
+					ret["error_code"] = (int64_t)loadError.code;
+					ret["error_description"] = [loadError.localizedDescription UTF8String];
+				} else {
+					ret["result"] = "ok";
+					ret["total_count"] = (int64_t)totalCount;
+
+					Array entry_list;
+					for (GKLeaderboard.Entry *e in entries) {
+						Dictionary ed;
+						ed["rank"] = (int64_t)e.rank;
+						ed["score"] = (int64_t)e.score;
+						ed["context"] = (int64_t)e.context;
+						ed["display_name"] = [e.player.displayName UTF8String];
+						ed["alias"] = [e.player.alias UTF8String];
+						if (@available(iOS 13, *)) {
+							ed["player_id"] = [e.player.teamPlayerID UTF8String];
+						} else {
+							ed["player_id"] = [e.player.playerID UTF8String];
+						}
+						entry_list.push_back(ed);
+					}
+					ret["entries"] = entry_list;
+
+					// Local player entry (may be outside the requested range).
+					if (localEntry) {
+						Dictionary le;
+						le["rank"] = (int64_t)localEntry.rank;
+						le["score"] = (int64_t)localEntry.score;
+						le["context"] = (int64_t)localEntry.context;
+						le["display_name"] = [localEntry.player.displayName UTF8String];
+						ret["local_entry"] = le;
+					}
+				}
+				pending_events.push_back(ret);
+			}];
+		}];
+	} else {
+		// iOS < 14 fallback — not supported.
+		Dictionary ret;
+		ret["type"] = "leaderboard_entries";
+		ret["result"] = "error";
+		ret["error_description"] = "loadEntries requires iOS 14+";
+		pending_events.push_back(ret);
+	}
+
+	return OK;
+}
 
 void GameCenter::add_pending_event(const Dictionary &p_event) {
 	pending_events.push_back(p_event);

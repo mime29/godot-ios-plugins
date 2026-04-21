@@ -67,6 +67,9 @@ public:
 
 	void game_center_closed();
 
+	// Leaderboard entries (modern GKLeaderboard.loadEntries API).
+	Error request_leaderboard_entries(Dictionary p_params);
+
 	// Real-time matchmaking (GKMatch / GKMatchmakerViewController).
 	Error find_match(Dictionary p_params);
 	Error send_match_data(String p_data);
