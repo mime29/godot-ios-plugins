@@ -6,6 +6,7 @@
 /*                      https://godotengine.org                          */
 /*************************************************************************/
 /* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2025 mime29 (Game Center matchmaking + Godot 4.6 fixes) */
 /* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
@@ -31,6 +32,9 @@
 #include "game_center.h"
 
 #import "game_center_delegate.h"
+#import "game_center_match_delegate.h"
+
+static GodotGameCenterMatchDelegate *matchDelegate = nil;
 
 #if VERSION_MAJOR == 4
 #if VERSION_MINOR >= 6
@@ -77,6 +81,13 @@ void GameCenter::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_pending_event_count"), &GameCenter::get_pending_event_count);
 	ClassDB::bind_method(D_METHOD("pop_pending_event"), &GameCenter::pop_pending_event);
+
+	// Matchmaking.
+	ClassDB::bind_method(D_METHOD("find_match"), &GameCenter::find_match);
+	ClassDB::bind_method(D_METHOD("send_match_data"), &GameCenter::send_match_data);
+	ClassDB::bind_method(D_METHOD("send_match_data_reliable"), &GameCenter::send_match_data_reliable);
+	ClassDB::bind_method(D_METHOD("disconnect_match"), &GameCenter::disconnect_match);
+	ClassDB::bind_method(D_METHOD("choose_best_host"), &GameCenter::choose_best_host);
 };
 
 Error GameCenter::authenticate() {
@@ -88,7 +99,33 @@ Error GameCenter::authenticate() {
 	GKLocalPlayer *player = [GKLocalPlayer localPlayer];
 	ERR_FAIL_COND_V(![player respondsToSelector:@selector(authenticateHandler)], ERR_UNAVAILABLE);
 
-	UIViewController *root_controller = [[UIApplication sharedApplication] delegate].window.rootViewController;
+	UIViewController *root_controller = nil;
+	if (@available(iOS 13, *)) {
+		for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+			if ([scene isKindOfClass:[UIWindowScene class]]) {
+				UIWindowScene *ws = (UIWindowScene *)scene;
+				for (UIWindow *w in ws.windows) {
+					if (w.rootViewController) {
+						root_controller = w.rootViewController;
+						if (w.isKeyWindow) break;
+					}
+				}
+				if (root_controller) break;
+			}
+		}
+	}
+	if (!root_controller) {
+		UIWindow *w = [[UIApplication sharedApplication] delegate].window;
+		if (w) root_controller = w.rootViewController;
+	}
+	if (!root_controller) {
+		for (UIWindow *w in [UIApplication sharedApplication].windows) {
+			if (w.isKeyWindow && w.rootViewController) {
+				root_controller = w.rootViewController;
+				break;
+			}
+		}
+	}
 	ERR_FAIL_COND_V(!root_controller, FAILED);
 
 	// This handler is called several times.  First when the view needs to be shown, then again
@@ -138,30 +175,45 @@ bool GameCenter::is_authenticated() {
 
 Error GameCenter::post_score(Dictionary p_score) {
 	ERR_FAIL_COND_V(!p_score.has("score") || !p_score.has("category"), ERR_INVALID_PARAMETER);
-	float score = p_score["score"];
+	int64_t score = p_score["score"];
 	String category = p_score["category"];
-
+	int64_t context = 0;
+	if (p_score.has("context")) {
+		context = p_score["context"];
+	}
 	NSString *cat_str = [[NSString alloc] initWithUTF8String:category.utf8().get_data()];
-	GKScore *reporter = [[GKScore alloc] initWithLeaderboardIdentifier:cat_str];
-	reporter.value = score;
 
-	ERR_FAIL_COND_V([GKScore respondsToSelector:@selector(reportScores)], ERR_UNAVAILABLE);
-
-	[GKScore reportScores:@[ reporter ]
-			withCompletionHandler:^(NSError *error) {
-				Dictionary ret;
-				ret["type"] = "post_score";
-				if (error == nil) {
-					ret["result"] = "ok";
-				} else {
-					ret["result"] = "error";
-					ret["error_code"] = (int64_t)error.code;
-					ret["error_description"] = [error.localizedDescription UTF8String];
-				};
-
-				pending_events.push_back(ret);
-			}];
-
+	if (@available(iOS 14, *)) {
+		[GKLeaderboard submitScore:score
+		                   context:(NSUInteger)context
+		                    player:[GKLocalPlayer localPlayer]
+		      leaderboardIDs:@[cat_str]
+		     completionHandler:^(NSError *error) {
+			Dictionary ret;
+			ret["type"] = "post_score";
+			ret["result"] = error == nil ? "ok" : "error";
+			if (error) {
+				ret["error_code"] = (int64_t)error.code;
+				ret["error_description"] = [error.localizedDescription UTF8String];
+			}
+			pending_events.push_back(ret);
+		}];
+	} else {
+		GKScore *reporter = [[GKScore alloc] initWithLeaderboardIdentifier:cat_str];
+		reporter.value = score;
+		reporter.context = (uint64_t)context;
+		[GKScore reportScores:@[ reporter ]
+				withCompletionHandler:^(NSError *error) {
+					Dictionary ret;
+					ret["type"] = "post_score";
+					ret["result"] = error == nil ? "ok" : "error";
+					if (error) {
+						ret["error_code"] = (int64_t)error.code;
+						ret["error_description"] = [error.localizedDescription UTF8String];
+					}
+					pending_events.push_back(ret);
+				}];
+	}
 	return OK;
 };
 
@@ -320,7 +372,33 @@ Error GameCenter::show_game_center(Dictionary p_params) {
 	GKGameCenterViewController *controller = [[GKGameCenterViewController alloc] init];
 	ERR_FAIL_COND_V(!controller, FAILED);
 
-	UIViewController *root_controller = [[UIApplication sharedApplication] delegate].window.rootViewController;
+	UIViewController *root_controller = nil;
+	if (@available(iOS 13, *)) {
+		for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+			if ([scene isKindOfClass:[UIWindowScene class]]) {
+				UIWindowScene *ws = (UIWindowScene *)scene;
+				for (UIWindow *w in ws.windows) {
+					if (w.rootViewController) {
+						root_controller = w.rootViewController;
+						if (w.isKeyWindow) break;
+					}
+				}
+				if (root_controller) break;
+			}
+		}
+	}
+	if (!root_controller) {
+		UIWindow *w = [[UIApplication sharedApplication] delegate].window;
+		if (w) root_controller = w.rootViewController;
+	}
+	if (!root_controller) {
+		for (UIWindow *w in [UIApplication sharedApplication].windows) {
+			if (w.isKeyWindow && w.rootViewController) {
+				root_controller = w.rootViewController;
+				break;
+			}
+		}
+	}
 	ERR_FAIL_COND_V(!root_controller, FAILED);
 
 	controller.gameCenterDelegate = gameCenterDelegate;
@@ -396,6 +474,85 @@ Variant GameCenter::pop_pending_event() {
 GameCenter *GameCenter::get_singleton() {
 	return instance;
 };
+
+void GameCenter::add_pending_event(const Dictionary &p_event) {
+	pending_events.push_back(p_event);
+}
+
+Error GameCenter::find_match(Dictionary p_params) {
+	ERR_FAIL_COND_V(!is_authenticated(), ERR_UNAUTHORIZED);
+	int min_players = p_params.has("min_players") ? (int)p_params["min_players"] : 2;
+	int max_players = p_params.has("max_players") ? (int)p_params["max_players"] : 2;
+	int player_group = p_params.has("player_group") ? (int)p_params["player_group"] : 0;
+
+	GKMatchRequest *request = [[GKMatchRequest alloc] init];
+	request.minPlayers = min_players;
+	request.maxPlayers = max_players;
+	if (player_group > 0) request.playerGroup = player_group;
+
+	GKMatchmakerViewController *mmvc = [[GKMatchmakerViewController alloc] initWithMatchRequest:request];
+	ERR_FAIL_COND_V(!mmvc, FAILED);
+	if (!matchDelegate) matchDelegate = [[GodotGameCenterMatchDelegate alloc] init];
+	mmvc.matchmakerDelegate = matchDelegate;
+
+	UIViewController *root_controller = nil;
+	if (@available(iOS 13, *)) {
+		for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+			if ([scene isKindOfClass:[UIWindowScene class]]) {
+				UIWindowScene *ws = (UIWindowScene *)scene;
+				for (UIWindow *w in ws.windows) {
+					if (w.rootViewController) { root_controller = w.rootViewController; if (w.isKeyWindow) break; }
+				}
+				if (root_controller) break;
+			}
+		}
+	}
+	if (!root_controller) root_controller = [[UIApplication sharedApplication] delegate].window.rootViewController;
+	ERR_FAIL_COND_V(!root_controller, FAILED);
+	[root_controller presentViewController:mmvc animated:YES completion:nil];
+	return OK;
+}
+
+Error GameCenter::send_match_data(String p_data) {
+	ERR_FAIL_COND_V(!matchDelegate || !matchDelegate.currentMatch, ERR_UNCONFIGURED);
+	NSData *data = [[NSString stringWithUTF8String:p_data.utf8().get_data()] dataUsingEncoding:NSUTF8StringEncoding];
+	NSError *error = nil;
+	[matchDelegate.currentMatch sendDataToAllPlayers:data withDataMode:GKMatchSendDataUnreliable error:&error];
+	return error ? FAILED : OK;
+}
+
+Error GameCenter::send_match_data_reliable(String p_data) {
+	ERR_FAIL_COND_V(!matchDelegate || !matchDelegate.currentMatch, ERR_UNCONFIGURED);
+	NSData *data = [[NSString stringWithUTF8String:p_data.utf8().get_data()] dataUsingEncoding:NSUTF8StringEncoding];
+	NSError *error = nil;
+	[matchDelegate.currentMatch sendDataToAllPlayers:data withDataMode:GKMatchSendDataReliable error:&error];
+	return error ? FAILED : OK;
+}
+
+void GameCenter::disconnect_match() {
+	if (matchDelegate && matchDelegate.currentMatch) {
+		[matchDelegate.currentMatch disconnect];
+		matchDelegate.currentMatch = nil;
+	}
+}
+
+void GameCenter::choose_best_host() {
+	ERR_FAIL_COND(!matchDelegate || !matchDelegate.currentMatch);
+	[matchDelegate.currentMatch chooseBestHostingPlayerWithCompletionHandler:^(GKPlayer *bestHost) {
+		Dictionary ret;
+		ret["type"] = "best_host";
+		if (bestHost) {
+			ret["display_name"] = [bestHost.displayName UTF8String];
+			if (@available(iOS 13, *)) { ret["player_id"] = [bestHost.teamPlayerID UTF8String]; }
+			else { ret["player_id"] = [bestHost.playerID UTF8String]; }
+			ret["is_local"] = [bestHost isEqual:[GKLocalPlayer localPlayer]] ? true : false;
+		} else {
+			ret["player_id"] = "";
+			ret["is_local"] = true;
+		}
+		GameCenter::get_singleton()->add_pending_event(ret);
+	}];
+}
 
 GameCenter::GameCenter() {
 	ERR_FAIL_COND(instance != NULL);
