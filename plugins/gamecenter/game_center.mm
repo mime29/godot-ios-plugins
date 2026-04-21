@@ -571,7 +571,18 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 }
 
 void GameCenter::add_pending_event(const Dictionary &p_event) {
-	pending_events.push_back(p_event);
+	// Many GameKit callbacks fire on background threads (Swift concurrency,
+	// GCD completion handlers). Godot's data structures are NOT thread-safe,
+	// so always dispatch to main thread before touching pending_events.
+	if ([NSThread isMainThread]) {
+		pending_events.push_back(p_event);
+	} else {
+		// Copy the dictionary so it survives the async dispatch.
+		Dictionary copy = p_event;
+		dispatch_async(dispatch_get_main_queue(), ^{
+			pending_events.push_back(copy);
+		});
+	}
 }
 
 Error GameCenter::find_match(Dictionary p_params) {
