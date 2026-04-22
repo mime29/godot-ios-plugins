@@ -15,7 +15,7 @@
 @class GKMatch;
 @class GKPlayer;
 
-@interface GodotGameCenterMatchDelegate : NSObject <GKMatchmakerViewControllerDelegate, GKMatchDelegate, GKInviteEventListener>
+@interface GodotGameCenterMatchDelegate : NSObject <GKMatchmakerViewControllerDelegate, GKMatchDelegate, GKLocalPlayerListener>
 
 @property (nonatomic, strong) GKMatch *currentMatch;
 
