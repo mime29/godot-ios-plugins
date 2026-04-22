@@ -80,4 +80,38 @@
 	return NO;
 }
 
+// GKInviteEventListener — handle incoming match invitations.
+// When a friend taps an invitation, iOS calls this method on the registered
+// GKLocalPlayerListener. We present the GKMatchmakerViewController with the
+// invite so the native UI handles the connection.
+- (void)player:(GKPlayer *)player didAcceptInvite:(GKInvite *)invite {
+	GKMatchmakerViewController *mmvc = [[GKMatchmakerViewController alloc] initWithInvite:invite];
+	if (!mmvc) return;
+	mmvc.matchmakerDelegate = self;
+
+	dispatch_async(dispatch_get_main_queue(), ^{
+		UIViewController *root_controller = nil;
+		if (@available(iOS 13, *)) {
+			for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+				if ([scene isKindOfClass:[UIWindowScene class]]) {
+					UIWindowScene *ws = (UIWindowScene *)scene;
+					for (UIWindow *w in ws.windows) {
+						if (w.rootViewController) {
+							root_controller = w.rootViewController;
+							if (w.isKeyWindow) break;
+						}
+					}
+					if (root_controller) break;
+				}
+			}
+		}
+		if (!root_controller) {
+			root_controller = [[UIApplication sharedApplication] delegate].window.rootViewController;
+		}
+		if (root_controller) {
+			[root_controller presentViewController:mmvc animated:YES completion:nil];
+		}
+	});
+}
+
 @end

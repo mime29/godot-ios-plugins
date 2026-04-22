@@ -158,6 +158,13 @@ Error GameCenter::authenticate() {
 				}
 
 				GameCenter::get_singleton()->authenticated = true;
+
+				// Register the match delegate as a GKLocalPlayerListener so
+				// it receives incoming match invitations via player:didAcceptInvite:.
+				if (!matchDelegate) {
+					matchDelegate = [[GodotGameCenterMatchDelegate alloc] init];
+				}
+				[GKLocalPlayer.localPlayer registerListener:matchDelegate];
 			} else {
 				ret["result"] = "error";
 				ret["error_code"] = (int64_t)error.code;
