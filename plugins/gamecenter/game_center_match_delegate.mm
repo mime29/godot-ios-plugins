@@ -84,34 +84,61 @@
 // When a friend taps an invitation, iOS calls this method on the registered
 // GKLocalPlayerListener. We present the GKMatchmakerViewController with the
 // invite so the native UI handles the connection.
+//
+// On cold start, this can fire before authentication completes or before
+// the root view controller is available. In that case, store the invite
+// and present it later via presentPendingInviteIfNeeded.
 - (void)player:(GKPlayer *)player didAcceptInvite:(GKInvite *)invite {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		UIViewController *root_controller = [self _findRootController];
+		if (root_controller && GKLocalPlayer.localPlayer.isAuthenticated) {
+			[self _presentInvite:invite onController:root_controller];
+		} else {
+			// App still starting up — save for later.
+			self.pendingInvite = invite;
+		}
+	});
+}
+
+- (void)presentPendingInviteIfNeeded {
+	if (!self.pendingInvite) return;
+	GKInvite *invite = self.pendingInvite;
+	self.pendingInvite = nil;
+	dispatch_async(dispatch_get_main_queue(), ^{
+		UIViewController *root_controller = [self _findRootController];
+		if (root_controller) {
+			[self _presentInvite:invite onController:root_controller];
+		}
+	});
+}
+
+- (void)_presentInvite:(GKInvite *)invite onController:(UIViewController *)root_controller {
 	GKMatchmakerViewController *mmvc = [[GKMatchmakerViewController alloc] initWithInvite:invite];
 	if (!mmvc) return;
 	mmvc.matchmakerDelegate = self;
+	[root_controller presentViewController:mmvc animated:YES completion:nil];
+}
 
-	dispatch_async(dispatch_get_main_queue(), ^{
-		UIViewController *root_controller = nil;
-		if (@available(iOS 13, *)) {
-			for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-				if ([scene isKindOfClass:[UIWindowScene class]]) {
-					UIWindowScene *ws = (UIWindowScene *)scene;
-					for (UIWindow *w in ws.windows) {
-						if (w.rootViewController) {
-							root_controller = w.rootViewController;
-							if (w.isKeyWindow) break;
-						}
+- (UIViewController *)_findRootController {
+	UIViewController *root_controller = nil;
+	if (@available(iOS 13, *)) {
+		for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+			if ([scene isKindOfClass:[UIWindowScene class]]) {
+				UIWindowScene *ws = (UIWindowScene *)scene;
+				for (UIWindow *w in ws.windows) {
+					if (w.rootViewController) {
+						root_controller = w.rootViewController;
+						if (w.isKeyWindow) break;
 					}
-					if (root_controller) break;
 				}
+				if (root_controller) break;
 			}
 		}
-		if (!root_controller) {
-			root_controller = [[UIApplication sharedApplication] delegate].window.rootViewController;
-		}
-		if (root_controller) {
-			[root_controller presentViewController:mmvc animated:YES completion:nil];
-		}
-	});
+	}
+	if (!root_controller) {
+		root_controller = [[UIApplication sharedApplication] delegate].window.rootViewController;
+	}
+	return root_controller;
 }
 
 @end

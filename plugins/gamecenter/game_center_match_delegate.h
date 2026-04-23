@@ -18,5 +18,9 @@
 @interface GodotGameCenterMatchDelegate : NSObject <GKMatchmakerViewControllerDelegate, GKMatchDelegate, GKLocalPlayerListener>
 
 @property (nonatomic, strong) GKMatch *currentMatch;
+@property (nonatomic, strong) GKInvite *pendingInvite;
+
+/// Call after authentication to present any invite that arrived during cold start.
+- (void)presentPendingInviteIfNeeded;
 
 @end
