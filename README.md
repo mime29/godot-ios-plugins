@@ -1,11 +1,12 @@
-# Godot iOS plugins
+# Godot iOS/tvOS plugins
 
 [`master` branch](https://github.com/godotengine/godot-ios-plugins/tree/master) is the current development branch and can introduce breaking changes to plugin's public interface.
 [`3.3` branch](https://github.com/godotengine/godot-ios-plugins/tree/3.3)'s aim is to provide same public interface as it was before the switch to new iOS plugin system.
 
-**Note:** iOS plugins are only effective on iOS (either on a physical device or
-in the Xcode simulator). Their singletons will *not* be available when running
-the project from the editor, so you need to export your project to test your changes.
+**Note:** Apple embedded plugins are only effective on exported iOS/tvOS apps
+(either on a physical device or in a supported Xcode simulator). Their
+singletons will *not* be available when running the project from the editor, so
+you need to export your project to test your changes.
 
 ## Instructions
 
@@ -54,10 +55,16 @@ Once the actual compilation starts, you can stop this command by pressing <kbd>C
 - Run the command below to generate an `.a` static library for chosen target:
 
 ```bash
-scons target=<debug|release|release_debug> arch=<arch> simulator=<no|yes> plugin=<plugin_name> version=<3.x|4.0>
+scons target=<debug|release|release_debug> arch=<arch> simulator=<no|yes> platform=<ios|tvos> plugin=<plugin_name> version=<3.x|4.0>
 ```
 
 **Note:** Godot's official `debug` export templates are compiled with the `release_debug` target, *not* the `debug` target.
+
+For tvOS Game Center builds:
+
+```bash
+scons target=release_debug arch=arm64 platform=tvos plugin=gamecenter version=4.0
+```
 
 ## Building a `.a` library
 
@@ -71,6 +78,19 @@ scons target=<debug|release|release_debug> arch=<arch> simulator=<no|yes> plugin
   to generate `xcframework` with specific configuration.
   `xcframework` allows plugin to support both `arm64` device and `arm64` simulator.
 - The result `.xcframework` will be stored in the `bin/` folder as well as intermidiate `.a` binaries.
+- Pass a fourth argument to choose the platform:
+
+```bash
+./scripts/generate_xcframework.sh gamecenter release_debug 4.0 ios
+./scripts/generate_xcframework.sh gamecenter release_debug 4.0 tvos
+./scripts/generate_xcframework.sh gamecenter release_debug 4.0 all
+```
+
+The default remains `ios` to preserve the previous build behavior. tvOS
+xcframeworks include the Apple TV device slice by default. To also attempt a
+tvOS simulator slice, set `BUILD_TVOS_SIMULATOR=1`; some Xcode 26 SDK
+installations currently fail while compiling GameKit's Apple TV simulator module
+graph, so simulator support is opt-in.
 
 ## Documentation
 

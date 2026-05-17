@@ -111,7 +111,7 @@ Error GameCenter::authenticate() {
 				ret["alias"] = [player.alias UTF8String];
 				ret["displayName"] = [player.displayName UTF8String];
 
-				if (@available(iOS 13, *)) {
+				if (@available(iOS 13.0, tvOS 13.0, *)) {
 					ret["player_id"] = [player.teamPlayerID UTF8String];
 				} else {
 					ret["player_id"] = [player.playerID UTF8String];
@@ -352,7 +352,7 @@ Error GameCenter::request_identity_verification_signature() {
 			ret["signature"] = [[signature base64EncodedStringWithOptions:0] UTF8String];
 			ret["salt"] = [[salt base64EncodedStringWithOptions:0] UTF8String];
 			ret["timestamp"] = timestamp;
-			if (@available(iOS 13.5, *)) {
+			if (@available(iOS 13.5, tvOS 13.5, *)) {
 				ret["player_id"] = [player.teamPlayerID UTF8String];
 			} else {
 				ret["player_id"] = [player.playerID UTF8String];
@@ -366,7 +366,7 @@ Error GameCenter::request_identity_verification_signature() {
 		pending_events.push_back(ret);
 	};
 
-	if (@available(iOS 13.5, *)) {
+	if (@available(iOS 13.5, tvOS 13.5, *)) {
 		[player fetchItemsForIdentityVerificationSignature:verificationSignatureHandler];
 	} else {
 		[player generateIdentityVerificationSignatureWithCompletionHandler:verificationSignatureHandler];
