@@ -39,7 +39,7 @@
 		Dictionary p;
 		p["display_name"] = [player.displayName UTF8String];
 		p["alias"] = [player.alias UTF8String];
-		if (@available(iOS 13, *)) {
+		if (@available(iOS 13.0, tvOS 13.0, *)) {
 			p["player_id"] = [player.teamPlayerID UTF8String];
 		} else {
 			p["player_id"] = [player.playerID UTF8String];
@@ -60,7 +60,7 @@
 	Dictionary ret;
 	ret["type"] = "match_data_received";
 	ret["data"] = [str UTF8String];
-	if (@available(iOS 13, *)) { ret["player_id"] = [player.teamPlayerID UTF8String]; }
+	if (@available(iOS 13.0, tvOS 13.0, *)) { ret["player_id"] = [player.teamPlayerID UTF8String]; }
 	else { ret["player_id"] = [player.playerID UTF8String]; }
 	ret["display_name"] = [player.displayName UTF8String];
 	GameCenter::get_singleton()->add_pending_event(ret);
@@ -69,7 +69,7 @@
 - (void)match:(GKMatch *)match player:(GKPlayer *)player didChangeConnectionState:(GKPlayerConnectionState)state {
 	Dictionary ret;
 	ret["type"] = "match_player_state_changed";
-	if (@available(iOS 13, *)) { ret["player_id"] = [player.teamPlayerID UTF8String]; }
+	if (@available(iOS 13.0, tvOS 13.0, *)) { ret["player_id"] = [player.teamPlayerID UTF8String]; }
 	else { ret["player_id"] = [player.playerID UTF8String]; }
 	ret["display_name"] = [player.displayName UTF8String];
 	ret["state"] = (state == GKPlayerStateConnected) ? "connected" : "disconnected";
@@ -121,7 +121,7 @@
 
 - (UIViewController *)_findRootController {
 	UIViewController *root_controller = nil;
-	if (@available(iOS 13, *)) {
+	if (@available(iOS 13.0, tvOS 13.0, *)) {
 		for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
 			if ([scene isKindOfClass:[UIWindowScene class]]) {
 				UIWindowScene *ws = (UIWindowScene *)scene;
