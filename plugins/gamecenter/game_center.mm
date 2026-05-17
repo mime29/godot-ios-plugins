@@ -103,7 +103,7 @@ Error GameCenter::authenticate() {
 	ERR_FAIL_COND_V(![player respondsToSelector:@selector(authenticateHandler)], ERR_UNAVAILABLE);
 
 	UIViewController *root_controller = nil;
-	if (@available(iOS 13, *)) {
+	if (@available(iOS 13.0, tvOS 13.0, *)) {
 		for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
 			if ([scene isKindOfClass:[UIWindowScene class]]) {
 				UIWindowScene *ws = (UIWindowScene *)scene;
@@ -151,7 +151,7 @@ Error GameCenter::authenticate() {
 				ret["alias"] = [player.alias UTF8String];
 				ret["displayName"] = [player.displayName UTF8String];
 
-				if (@available(iOS 13, *)) {
+				if (@available(iOS 13.0, tvOS 13.0, *)) {
 					ret["player_id"] = [player.teamPlayerID UTF8String];
 				} else {
 					ret["player_id"] = [player.playerID UTF8String];
@@ -191,7 +191,7 @@ Error GameCenter::post_score(Dictionary p_score) {
 	}
 	NSString *cat_str = [[NSString alloc] initWithUTF8String:category.utf8().get_data()];
 
-	if (@available(iOS 14, *)) {
+	if (@available(iOS 14.0, tvOS 14.0, *)) {
 		[GKLeaderboard submitScore:score
 		                   context:(NSUInteger)context
 		                    player:[GKLocalPlayer localPlayer]
@@ -381,7 +381,7 @@ Error GameCenter::show_game_center(Dictionary p_params) {
 	ERR_FAIL_COND_V(!controller, FAILED);
 
 	UIViewController *root_controller = nil;
-	if (@available(iOS 13, *)) {
+	if (@available(iOS 13.0, tvOS 13.0, *)) {
 		for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
 			if ([scene isKindOfClass:[UIWindowScene class]]) {
 				UIWindowScene *ws = (UIWindowScene *)scene;
@@ -438,7 +438,7 @@ Error GameCenter::request_identity_verification_signature() {
 			ret["signature"] = [[signature base64EncodedStringWithOptions:0] UTF8String];
 			ret["salt"] = [[salt base64EncodedStringWithOptions:0] UTF8String];
 			ret["timestamp"] = timestamp;
-			if (@available(iOS 13.5, *)) {
+			if (@available(iOS 13.5, tvOS 13.5, *)) {
 				ret["player_id"] = [player.teamPlayerID UTF8String];
 			} else {
 				ret["player_id"] = [player.playerID UTF8String];
@@ -452,7 +452,7 @@ Error GameCenter::request_identity_verification_signature() {
 		pending_events.push_back(ret);
 	};
 
-	if (@available(iOS 13.5, *)) {
+	if (@available(iOS 13.5, tvOS 13.5, *)) {
 		[player fetchItemsForIdentityVerificationSignature:verificationSignatureHandler];
 	} else {
 		[player generateIdentityVerificationSignatureWithCompletionHandler:verificationSignatureHandler];
@@ -494,7 +494,7 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 
 	NSString *lid = [[NSString alloc] initWithUTF8String:leaderboard_id.utf8().get_data()];
 
-	if (@available(iOS 14, *)) {
+	if (@available(iOS 14.0, tvOS 14.0, *)) {
 		[GKLeaderboard loadLeaderboardsWithIDs:@[lid]
 			completionHandler:^(NSArray<GKLeaderboard *> *leaderboards, NSError *error) {
 			if (error || leaderboards.count == 0) {
@@ -541,7 +541,7 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 						ed["context"] = (int64_t)e.context;
 						ed["display_name"] = [e.player.displayName UTF8String];
 						ed["alias"] = [e.player.alias UTF8String];
-						if (@available(iOS 13, *)) {
+						if (@available(iOS 13.0, tvOS 13.0, *)) {
 							ed["player_id"] = [e.player.teamPlayerID UTF8String];
 						} else {
 							ed["player_id"] = [e.player.playerID UTF8String];
@@ -568,7 +568,7 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 		Dictionary ret;
 		ret["type"] = "leaderboard_entries";
 		ret["result"] = "error";
-		ret["error_description"] = "loadEntries requires iOS 14+";
+		ret["error_description"] = "loadEntries requires iOS/tvOS 14+";
 		pending_events.push_back(ret);
 	}
 
@@ -607,7 +607,7 @@ Error GameCenter::find_match(Dictionary p_params) {
 	mmvc.matchmakerDelegate = matchDelegate;
 
 	UIViewController *root_controller = nil;
-	if (@available(iOS 13, *)) {
+	if (@available(iOS 13.0, tvOS 13.0, *)) {
 		for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
 			if ([scene isKindOfClass:[UIWindowScene class]]) {
 				UIWindowScene *ws = (UIWindowScene *)scene;
@@ -654,7 +654,7 @@ void GameCenter::choose_best_host() {
 		ret["type"] = "best_host";
 		if (bestHost) {
 			ret["display_name"] = [bestHost.displayName UTF8String];
-			if (@available(iOS 13, *)) { ret["player_id"] = [bestHost.teamPlayerID UTF8String]; }
+			if (@available(iOS 13.0, tvOS 13.0, *)) { ret["player_id"] = [bestHost.teamPlayerID UTF8String]; }
 			else { ret["player_id"] = [bestHost.playerID UTF8String]; }
 			ret["is_local"] = [bestHost isEqual:[GKLocalPlayer localPlayer]] ? true : false;
 		} else {
