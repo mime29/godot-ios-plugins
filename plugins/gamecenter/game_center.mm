@@ -38,7 +38,11 @@ static GodotGameCenterMatchDelegate *matchDelegate = nil;
 
 #if VERSION_MAJOR == 4
 #if VERSION_MINOR >= 6
+#if __has_include("drivers/apple_embedded/godot_app_delegate.h")
 #import "drivers/apple_embedded/godot_app_delegate.h"
+#else
+#import "drivers/apple_embedded/godot_app_delegate_apple_embedded.h"
+#endif
 #import "drivers/apple_embedded/godot_view_controller.h"
 #elif VERSION_MINOR >= 5
 #import "drivers/apple_embedded/godot_app_delegate.h"
@@ -53,6 +57,8 @@ static GodotGameCenterMatchDelegate *matchDelegate = nil;
 #endif
 
 #import <GameKit/GameKit.h>
+#import <StoreKit/StoreKit.h>
+#import <TargetConditionals.h>
 
 #if VERSION_MAJOR == 4
 typedef PackedStringArray GodotStringArray;
@@ -78,6 +84,7 @@ void GameCenter::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("request_achievement_descriptions"), &GameCenter::request_achievement_descriptions);
 	ClassDB::bind_method(D_METHOD("show_game_center"), &GameCenter::show_game_center);
 	ClassDB::bind_method(D_METHOD("request_identity_verification_signature"), &GameCenter::request_identity_verification_signature);
+	ClassDB::bind_method(D_METHOD("request_review"), &GameCenter::request_review);
 
 	ClassDB::bind_method(D_METHOD("get_pending_event_count"), &GameCenter::get_pending_event_count);
 	ClassDB::bind_method(D_METHOD("pop_pending_event"), &GameCenter::pop_pending_event);
@@ -459,6 +466,24 @@ Error GameCenter::request_identity_verification_signature() {
 	}
 
 	return OK;
+};
+
+Error GameCenter::request_review() {
+#if TARGET_OS_TV
+	return ERR_UNAVAILABLE;
+#else
+	if ((NSClassFromString(@"SKStoreReviewController")) == nil) {
+		return ERR_UNAVAILABLE;
+	}
+
+	dispatch_async(dispatch_get_main_queue(), ^{
+		if (@available(iOS 10.3, *)) {
+			[SKStoreReviewController requestReview];
+		}
+	});
+
+	return OK;
+#endif
 };
 
 void GameCenter::game_center_closed() {

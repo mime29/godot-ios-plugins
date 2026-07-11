@@ -11,9 +11,8 @@ else
 fi
 
 if [[ "$PLATFORM" == "tvos" ]]; then
-    # Only GameCenter is currently tvOS-ready. StoreKit is intentionally not
-    # used by Trivall's tvOS build, and media/APN plugins need separate tvOS
-    # availability audits before they can be released for Apple TV.
+    # Only GameCenter is currently tvOS-ready; media, APN, and store plugins
+    # need separate tvOS availability audits before they can be released.
     GODOT_PLUGINS="gamecenter"
 fi
 

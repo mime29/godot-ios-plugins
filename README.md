@@ -76,7 +76,7 @@ scons target=release_debug arch=arm64 platform=tvos plugin=gamecenter version=4.
 
 - Run `./scripts/generate_xcframework.sh <plugin_name> <debug|release|release_debug> <godot_version>`
   to generate `xcframework` with specific configuration.
-  `xcframework` allows plugin to support both `arm64` device and `arm64` simulator.
+  `xcframework` allows plugin to support both device and simulator slices.
 - The result `.xcframework` will be stored in the `bin/` folder as well as intermidiate `.a` binaries.
 - Pass a fourth argument to choose the platform:
 
@@ -86,11 +86,10 @@ scons target=release_debug arch=arm64 platform=tvos plugin=gamecenter version=4.
 ./scripts/generate_xcframework.sh gamecenter release_debug 4.0 all
 ```
 
-The default remains `ios` to preserve the previous build behavior. tvOS
-xcframeworks include the Apple TV device slice by default. To also attempt a
-tvOS simulator slice, set `BUILD_TVOS_SIMULATOR=1`; some Xcode 26 SDK
-installations currently fail while compiling GameKit's Apple TV simulator module
-graph, so simulator support is opt-in.
+The default remains `ios` to preserve the previous build behavior. iOS
+xcframeworks include `ios-arm64` and `ios-arm64_x86_64-simulator`; tvOS
+xcframeworks include `tvos-arm64` and `tvos-arm64_x86_64-simulator`. Passing
+`all` packages all four Apple embedded slices into one xcframework.
 
 ## Documentation
 

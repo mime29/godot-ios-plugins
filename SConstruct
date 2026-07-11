@@ -66,10 +66,12 @@ if env['platform'] == 'tvos' and env['version'] == '3.x':
 if env['platform'] == 'tvos':
     if env['simulator']:
         sdk_name = 'appletvsimulator'
+        env.Append(CCFLAGS=['-mtvos-simulator-version-min=13.0'])
+        env.Append(LINKFLAGS=["-mtvos-simulator-version-min=13.0"])
     else:
         sdk_name = 'appletvos'
-    env.Append(CCFLAGS=['-mtvos-version-min=13.0'])
-    env.Append(LINKFLAGS=["-mtvos-version-min=13.0"])
+        env.Append(CCFLAGS=['-mtvos-version-min=13.0'])
+        env.Append(LINKFLAGS=["-mtvos-version-min=13.0"])
 else:
     if env['simulator']:
         sdk_name = 'iphonesimulator'
@@ -162,18 +164,20 @@ if env['version'] == '4.0' and env['plugin'] == 'arkit':
     print("'arkit' plugin is 3.x only.")
     quit();
 
+godot_source_dir = os.environ.get("GODOT_SOURCE_DIR", "godot")
+
 # Adding header files
 if env['version'] == '3.x':
     env.Append(CPPPATH=[
         '.', 
-        'godot', 
-        'godot/platform/iphone',
+        godot_source_dir,
+        godot_source_dir + '/platform/iphone',
     ])
 else:
        env.Append(CPPPATH=[
         '.', 
-        'godot', 
-        'godot/platform/ios',
+        godot_source_dir,
+        godot_source_dir + '/platform/ios',
     ])
 
 # tweak this if you want to use different folders, or more folders, to store your source code in.

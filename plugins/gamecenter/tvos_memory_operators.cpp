@@ -1,12 +1,11 @@
 /*************************************************************************/
-/*  game_center.h                                                        */
+/*  tvos_memory_operators.cpp                                            */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2021 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2025 mime29 (Game Center matchmaking + Godot 4.6 fixes) */
+/* Copyright (c) 2025 mime29.                                            */
 /* Copyright (c) 2014-2021 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
@@ -29,65 +28,16 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-#ifndef GAME_CENTER_H
-#define GAME_CENTER_H
+#ifdef TVOS_ENABLED
 
-#include "core/version.h"
+#include "core/os/memory.h"
 
-#if VERSION_MAJOR == 4
-#include "core/object/class_db.h"
-#else
-#include "core/object.h"
-#endif
+void *__attribute__((weak)) operator new(size_t p_size, const char *p_description) {
+	return Memory::alloc_static(p_size, false);
+}
 
-class GameCenter : public Object {
-
-	GDCLASS(GameCenter, Object);
-
-	static GameCenter *instance;
-	static void _bind_methods();
-
-	List<Variant> pending_events;
-
-	bool authenticated;
-
-	void return_connect_error(const char *p_error_description);
-
-public:
-	Error authenticate();
-	bool is_authenticated();
-
-	Error post_score(Dictionary p_score);
-	Error award_achievement(Dictionary p_params);
-	void reset_achievements();
-	void request_achievements();
-	void request_achievement_descriptions();
-	Error show_game_center(Dictionary p_params);
-	Error request_identity_verification_signature();
-	Error request_review();
-
-	void game_center_closed();
-
-	// Leaderboard entries (modern GKLeaderboard.loadEntries API).
-	Error request_leaderboard_entries(Dictionary p_params);
-
-	// Real-time matchmaking (GKMatch / GKMatchmakerViewController).
-	Error find_match(Dictionary p_params);
-	Error send_match_data(String p_data);
-	Error send_match_data_reliable(String p_data);
-	void disconnect_match();
-	void choose_best_host();
-
-	// Public so delegates can push events.
-	void add_pending_event(const Dictionary &p_event);
-
-	int get_pending_event_count();
-	Variant pop_pending_event();
-
-	static GameCenter *get_singleton();
-
-	GameCenter();
-	~GameCenter();
-};
+void *__attribute__((weak)) operator new(size_t p_size, void *(*p_allocfunc)(size_t p_size)) {
+	return p_allocfunc(p_size);
+}
 
 #endif
