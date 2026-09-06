@@ -73,6 +73,19 @@ typedef PoolRealArray GodotFloatArray;
 GameCenter *GameCenter::instance = NULL;
 GodotGameCenterDelegate *gameCenterDelegate = nil;
 
+static NSString *godot_game_center_player_id(GKPlayer *p_player) {
+	if (!p_player) {
+		return @"";
+	}
+	if (@available(iOS 13.0, tvOS 13.0, *)) {
+		return p_player.gamePlayerID ?: @"";
+	}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+	return p_player.playerID ?: @"";
+#pragma clang diagnostic pop
+}
+
 void GameCenter::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("authenticate"), &GameCenter::authenticate);
 	ClassDB::bind_method(D_METHOD("is_authenticated"), &GameCenter::is_authenticated);
@@ -156,13 +169,10 @@ Error GameCenter::authenticate() {
 			if (player.isAuthenticated) {
 				ret["result"] = "ok";
 				ret["alias"] = [player.alias UTF8String];
+				ret["display_name"] = [player.displayName UTF8String];
 				ret["displayName"] = [player.displayName UTF8String];
 
-				if (@available(iOS 13.0, tvOS 13.0, *)) {
-					ret["player_id"] = [player.teamPlayerID UTF8String];
-				} else {
-					ret["player_id"] = [player.playerID UTF8String];
-				}
+				ret["player_id"] = [godot_game_center_player_id(player) UTF8String];
 
 				GameCenter::get_singleton()->authenticated = true;
 
@@ -177,7 +187,7 @@ Error GameCenter::authenticate() {
 				GameCenter::get_singleton()->authenticated = false;
 			};
 
-			pending_events.push_back(ret);
+			GameCenter::get_singleton()->add_pending_event(ret);
 		};
 	});
 
@@ -211,7 +221,7 @@ Error GameCenter::post_score(Dictionary p_score) {
 				ret["error_code"] = (int64_t)error.code;
 				ret["error_description"] = [error.localizedDescription UTF8String];
 			}
-			pending_events.push_back(ret);
+			GameCenter::get_singleton()->add_pending_event(ret);
 		}];
 	} else {
 		GKScore *reporter = [[GKScore alloc] initWithLeaderboardIdentifier:cat_str];
@@ -226,7 +236,7 @@ Error GameCenter::post_score(Dictionary p_score) {
 						ret["error_code"] = (int64_t)error.code;
 						ret["error_description"] = [error.localizedDescription UTF8String];
 					}
-					pending_events.push_back(ret);
+					GameCenter::get_singleton()->add_pending_event(ret);
 				}];
 	}
 	return OK;
@@ -260,7 +270,7 @@ Error GameCenter::award_achievement(Dictionary p_params) {
 						ret["error_code"] = (int64_t)error.code;
 					};
 
-					pending_events.push_back(ret);
+					GameCenter::get_singleton()->add_pending_event(ret);
 				}];
 
 	return OK;
@@ -316,7 +326,7 @@ void GameCenter::request_achievement_descriptions() {
 			ret["error_code"] = (int64_t)error.code;
 		};
 
-		pending_events.push_back(ret);
+		GameCenter::get_singleton()->add_pending_event(ret);
 	}];
 };
 
@@ -346,7 +356,7 @@ void GameCenter::request_achievements() {
 			ret["error_code"] = (int64_t)error.code;
 		};
 
-		pending_events.push_back(ret);
+		GameCenter::get_singleton()->add_pending_event(ret);
 	}];
 };
 
@@ -361,7 +371,7 @@ void GameCenter::reset_achievements() {
 			ret["error_code"] = (int64_t)error.code;
 		};
 
-		pending_events.push_back(ret);
+		GameCenter::get_singleton()->add_pending_event(ret);
 	}];
 };
 
@@ -445,18 +455,14 @@ Error GameCenter::request_identity_verification_signature() {
 			ret["signature"] = [[signature base64EncodedStringWithOptions:0] UTF8String];
 			ret["salt"] = [[salt base64EncodedStringWithOptions:0] UTF8String];
 			ret["timestamp"] = timestamp;
-			if (@available(iOS 13.5, tvOS 13.5, *)) {
-				ret["player_id"] = [player.teamPlayerID UTF8String];
-			} else {
-				ret["player_id"] = [player.playerID UTF8String];
-			}
+			ret["player_id"] = [godot_game_center_player_id(player) UTF8String];
 		} else {
 			ret["result"] = "error";
 			ret["error_code"] = (int64_t)error.code;
 			ret["error_description"] = [error.localizedDescription UTF8String];
 		};
 
-		pending_events.push_back(ret);
+		GameCenter::get_singleton()->add_pending_event(ret);
 	};
 
 	if (@available(iOS 13.5, tvOS 13.5, *)) {
@@ -490,7 +496,7 @@ void GameCenter::game_center_closed() {
 	Dictionary ret;
 	ret["type"] = "show_game_center";
 	ret["result"] = "ok";
-	pending_events.push_back(ret);
+	add_pending_event(ret);
 }
 
 int GameCenter::get_pending_event_count() {
@@ -532,7 +538,7 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 				} else {
 					ret["error_description"] = "Leaderboard not found";
 				}
-				pending_events.push_back(ret);
+				GameCenter::get_singleton()->add_pending_event(ret);
 				return;
 			}
 
@@ -566,11 +572,7 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 						ed["context"] = (int64_t)e.context;
 						ed["display_name"] = [e.player.displayName UTF8String];
 						ed["alias"] = [e.player.alias UTF8String];
-						if (@available(iOS 13.0, tvOS 13.0, *)) {
-							ed["player_id"] = [e.player.teamPlayerID UTF8String];
-						} else {
-							ed["player_id"] = [e.player.playerID UTF8String];
-						}
+						ed["player_id"] = [godot_game_center_player_id(e.player) UTF8String];
 						entry_list.push_back(ed);
 					}
 					ret["entries"] = entry_list;
@@ -582,10 +584,12 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 						le["score"] = (int64_t)localEntry.score;
 						le["context"] = (int64_t)localEntry.context;
 						le["display_name"] = [localEntry.player.displayName UTF8String];
+						le["alias"] = [localEntry.player.alias UTF8String];
+						le["player_id"] = [godot_game_center_player_id(localEntry.player) UTF8String];
 						ret["local_entry"] = le;
 					}
 				}
-				pending_events.push_back(ret);
+				GameCenter::get_singleton()->add_pending_event(ret);
 			}];
 		}];
 	} else {
@@ -594,7 +598,7 @@ Error GameCenter::request_leaderboard_entries(Dictionary p_params) {
 		ret["type"] = "leaderboard_entries";
 		ret["result"] = "error";
 		ret["error_description"] = "loadEntries requires iOS/tvOS 14+";
-		pending_events.push_back(ret);
+		add_pending_event(ret);
 	}
 
 	return OK;
@@ -679,8 +683,7 @@ void GameCenter::choose_best_host() {
 		ret["type"] = "best_host";
 		if (bestHost) {
 			ret["display_name"] = [bestHost.displayName UTF8String];
-			if (@available(iOS 13.0, tvOS 13.0, *)) { ret["player_id"] = [bestHost.teamPlayerID UTF8String]; }
-			else { ret["player_id"] = [bestHost.playerID UTF8String]; }
+			ret["player_id"] = [godot_game_center_player_id(bestHost) UTF8String];
 			ret["is_local"] = [bestHost isEqual:[GKLocalPlayer localPlayer]] ? true : false;
 		} else {
 			ret["player_id"] = "";

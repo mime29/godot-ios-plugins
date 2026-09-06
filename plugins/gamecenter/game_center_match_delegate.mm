@@ -11,6 +11,19 @@
 #import "game_center_match_delegate.h"
 #import "game_center.h"
 
+static NSString *godot_game_center_player_id(GKPlayer *p_player) {
+	if (!p_player) {
+		return @"";
+	}
+	if (@available(iOS 13.0, tvOS 13.0, *)) {
+		return p_player.gamePlayerID ?: @"";
+	}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+	return p_player.playerID ?: @"";
+#pragma clang diagnostic pop
+}
+
 @implementation GodotGameCenterMatchDelegate
 
 - (void)matchmakerViewControllerWasCancelled:(GKMatchmakerViewController *)viewController {
@@ -39,11 +52,7 @@
 		Dictionary p;
 		p["display_name"] = [player.displayName UTF8String];
 		p["alias"] = [player.alias UTF8String];
-		if (@available(iOS 13.0, tvOS 13.0, *)) {
-			p["player_id"] = [player.teamPlayerID UTF8String];
-		} else {
-			p["player_id"] = [player.playerID UTF8String];
-		}
+		p["player_id"] = [godot_game_center_player_id(player) UTF8String];
 		players.push_back(p);
 	}
 
@@ -60,8 +69,7 @@
 	Dictionary ret;
 	ret["type"] = "match_data_received";
 	ret["data"] = [str UTF8String];
-	if (@available(iOS 13.0, tvOS 13.0, *)) { ret["player_id"] = [player.teamPlayerID UTF8String]; }
-	else { ret["player_id"] = [player.playerID UTF8String]; }
+	ret["player_id"] = [godot_game_center_player_id(player) UTF8String];
 	ret["display_name"] = [player.displayName UTF8String];
 	GameCenter::get_singleton()->add_pending_event(ret);
 }
@@ -69,8 +77,7 @@
 - (void)match:(GKMatch *)match player:(GKPlayer *)player didChangeConnectionState:(GKPlayerConnectionState)state {
 	Dictionary ret;
 	ret["type"] = "match_player_state_changed";
-	if (@available(iOS 13.0, tvOS 13.0, *)) { ret["player_id"] = [player.teamPlayerID UTF8String]; }
-	else { ret["player_id"] = [player.playerID UTF8String]; }
+	ret["player_id"] = [godot_game_center_player_id(player) UTF8String];
 	ret["display_name"] = [player.displayName UTF8String];
 	ret["state"] = (state == GKPlayerStateConnected) ? "connected" : "disconnected";
 	GameCenter::get_singleton()->add_pending_event(ret);
